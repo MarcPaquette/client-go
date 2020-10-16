@@ -28,7 +28,9 @@ import (
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"k8s.io/client-go/kubernetes"
+	deploymentv1 "k8s.io/client-go/kubernetes/typed/apps/v1"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/util/homedir"
 	"k8s.io/client-go/util/retry"
@@ -45,6 +47,8 @@ import (
 
 func main() {
 	var kubeconfig *string
+	var deploymentName string = "demo-deployment"
+
 	if home := homedir.HomeDir(); home != "" {
 		kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
 	} else {
@@ -65,7 +69,7 @@ func main() {
 
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
-			Name: "demo-deployment",
+			Name: deploymentName,
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: int32Ptr(2),
@@ -106,10 +110,11 @@ func main() {
 		panic(err)
 	}
 	fmt.Printf("Created deployment %q.\n", result.GetObjectMeta().GetName())
+	printDeployments(deploymentsClient)
 
 	// Update Deployment
-	prompt()
 	fmt.Println("Updating deployment...")
+
 	//    You have two options to Update() this Deployment:
 	//
 	//    1. Modify the "deployment" variable and call: Update(deployment).
@@ -126,7 +131,7 @@ func main() {
 	retryErr := retry.RetryOnConflict(retry.DefaultRetry, func() error {
 		// Retrieve the latest version of Deployment before attempting update
 		// RetryOnConflict uses exponential backoff to avoid exhausting the apiserver
-		result, getErr := deploymentsClient.Get(context.TODO(), "demo-deployment", metav1.GetOptions{})
+		result, getErr := deploymentsClient.Get(context.TODO(), deploymentName, metav1.GetOptions{})
 		if getErr != nil {
 			panic(fmt.Errorf("Failed to get latest version of Deployment: %v", getErr))
 		}
@@ -139,29 +144,21 @@ func main() {
 	if retryErr != nil {
 		panic(fmt.Errorf("Update failed: %v", retryErr))
 	}
-	fmt.Println("Updated deployment...")
-
-	// List Deployments
-	prompt()
-	fmt.Printf("Listing deployments in namespace %q:\n", apiv1.NamespaceDefault)
-	list, err := deploymentsClient.List(context.TODO(), metav1.ListOptions{})
-	if err != nil {
-		panic(err)
-	}
-	for _, d := range list.Items {
-		fmt.Printf(" * %s (%d replicas)\n", d.Name, *d.Spec.Replicas)
-	}
+	fmt.Println("Updated deployment.")
+	printDeployments(deploymentsClient)
 
 	// Delete Deployment
-	prompt()
 	fmt.Println("Deleting deployment...")
 	deletePolicy := metav1.DeletePropagationForeground
-	if err := deploymentsClient.Delete(context.TODO(), "demo-deployment", metav1.DeleteOptions{
+	if err := deploymentsClient.Delete(context.TODO(), deploymentName, metav1.DeleteOptions{
 		PropagationPolicy: &deletePolicy,
 	}); err != nil {
 		panic(err)
 	}
 	fmt.Println("Deleted deployment.")
+	prompt()
+	printDeployments(deploymentsClient)
+
 }
 
 func prompt() {
@@ -177,3 +174,17 @@ func prompt() {
 }
 
 func int32Ptr(i int32) *int32 { return &i }
+
+func printDeployments(deployClient deploymentv1.DeploymentInterface) {
+	fmt.Printf("Listing Deployments in namespace %q:\n", apiv1.NamespaceDefault)
+
+	list, err := deployClient.List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		panic(err)
+	}
+
+	for _, d := range list.Items {
+		fmt.Printf("  * %s (%d replicas)\n", d.Name, *d.Spec.Replicas)
+	}
+	prompt()
+}
