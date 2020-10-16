@@ -161,18 +161,6 @@ func main() {
 
 }
 
-func prompt() {
-	fmt.Printf("-> Press Return key to continue.")
-	scanner := bufio.NewScanner(os.Stdin)
-	for scanner.Scan() {
-		break
-	}
-	if err := scanner.Err(); err != nil {
-		panic(err)
-	}
-	fmt.Println()
-}
-
 func int32Ptr(i int32) *int32 { return &i }
 
 func printDeployments(deployClient deploymentv1.DeploymentInterface) {
@@ -187,4 +175,16 @@ func printDeployments(deployClient deploymentv1.DeploymentInterface) {
 		fmt.Printf("  * %s (%d replicas)\n", d.Name, *d.Spec.Replicas)
 	}
 	prompt()
+}
+
+func prompt() {
+	fmt.Printf("-> Press Return key to continue.")
+	scanner := bufio.NewScanner(os.Stdin)
+	for scanner.Scan() {
+		break
+	}
+	if err := scanner.Err(); err != nil {
+		panic(err)
+	}
+	fmt.Println()
 }
